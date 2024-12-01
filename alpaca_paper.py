@@ -222,5 +222,5 @@ if __name__ == '__main__':
             
             time.sleep(62)
 
-        except AlpacaDataFetcherException as e:
+        except (AlpacaDataFetcherException, PlaceOrderException) as e:
             print(e)
