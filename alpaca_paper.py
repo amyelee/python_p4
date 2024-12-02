@@ -5,24 +5,7 @@ import json
 import pandas as pd
 import math
 
-## == old code in case stuff below does not work ==
-# # Set your Alpaca API key and secret
-# API_KEY = 'PKAS5FD8FYDEEC3PSTN0'
-# API_SECRET = 'xG9nPePOlf52cg4sfQRbYwq25ZW4nduBMypp8Y3V'
-# BASE_URL = 'https://paper-api.alpaca.markets'  # Use paper trading base URL for testing
-
-# # Initialize Alpaca API
-# api = tradeapi.REST(API_KEY, API_SECRET, base_url=BASE_URL, api_version='v2')
-
-# # Specify the asset symbol and trading interval
-# symbol = 'TSLA'  # Replace with your desired stock symbol
-# interval = 5  # Time interval in seconds
-
-# url = f"https://data.alpaca.markets/v2/stocks/bars/latest?symbols={symbol}&feed=iex"
-# headers = {"accept": "application/json", 
-#            "APCA-API-KEY-ID": API_KEY, 
-#            "APCA-API-SECRET-KEY": API_SECRET}
-
+# == Exceptions == 
 class AlpacaDataFetcherException(Exception):
     def __init__(self, message):            
         super().__init__(message)
@@ -80,13 +63,13 @@ class DualEWMASignal:
         if self.fast_ewma is None:
             self.fast_ewma = price
         else:
-            self.fast_ewma = self.alpha_fast * price + (1 - self.alpha_fast) * self.fast_ewma
+            self.fast_ewma = (self.alpha_fast * price) + ((1 - self.alpha_fast) * self.fast_ewma)
 
         # slow ewma
         if self.slow_ewma is None:
             self.slow_ewma = price
         else:
-            self.slow_ewma = self.alpha_slow * price + (1 - self.alpha_slow) * self.slow_ewma
+            self.slow_ewma = (self.alpha_slow * price) + ((1 - self.alpha_slow) * self.slow_ewma)
 
         # Generate trading signals
         if self.fast_ewma > self.slow_ewma:
@@ -118,7 +101,7 @@ class AlpacaTrader:
 
     def place_buy_order(self, symbol, qty):
         """
-        Place a buy order for the specified symbol and quantity.
+        Place a buy (market) order for the specified symbol and quantity.
         Params:
             symbol: Stock symbol to buy.
             qty: Quantity of stock to buy.
@@ -143,7 +126,7 @@ class AlpacaTrader:
 
     def place_sell_order(self, symbol, qty):
         """
-        Place a sell order for the specified symbol and quantity.
+        Place a sell (market) order for the specified symbol and quantity.
         Params:
             symbol: Stock symbol to sell.
             qty: Quantity of stock to sell.
@@ -173,7 +156,6 @@ class AlpacaTrader:
             self.place_sell_order(symbol, self.positions)
 
 
-# Initialize AlpacaDataFetcher
 if __name__ == '__main__':
     API_KEY = 'PKAS5FD8FYDEEC3PSTN0'
     API_SECRET = 'xG9nPePOlf52cg4sfQRbYwq25ZW4nduBMypp8Y3V'
@@ -192,13 +174,14 @@ if __name__ == '__main__':
             # Get Current time
             current_time = time.localtime()
             # Liquidate all positions at the end of the day
-            if current_time.tm_hour == 14 and current_time.tm_min >= 55:
+            if (current_time.tm_hour == 14) and (current_time.tm_min >= 55):
                 trader.eod_liquidate(SYMBOL)
                 break
             else:
                 # Get the last close price
                 latest_bars = fetcher.fetch_latest_bars()
                 if latest_bars:
+                    # generate signals/update ewma
                     fetcher.prices_fetched += 1
                     latest_close_price = latest_bars['c']
                     signal = signal_generator.update(latest_close_price)
@@ -220,7 +203,12 @@ if __name__ == '__main__':
                     trader.place_sell_order(SYMBOL, quantity)
                     print("Sell order placed at {}".format(latest_close_price))
             
+            # wait for next minbar
             time.sleep(62)
 
         except (AlpacaDataFetcherException, PlaceOrderException) as e:
             print(e)
+
+        except Exception:
+            print("An unexpected error occurred.")
+            break
