@@ -31,7 +31,7 @@ class AlpacaDataFetcher:
 
     def fetch_latest_bars(self):
         """
-        Fetch latest bars data for the specified symbol.
+        Fetch most recent minbar data for the specified symbol.
         Returns:
             Latest bars data.
         """
@@ -151,7 +151,6 @@ class AlpacaTrader:
             raise PlaceOrderException("Failed to place sell order.")
         else:
             self.positions -= qty
-        
 
     def eod_liquidate(self, symbol):
         """
@@ -162,15 +161,18 @@ class AlpacaTrader:
 
 
 if __name__ == '__main__':
-    API_KEY = 'PKQ7A3U6OL704ZZ8083C'
-    API_SECRET = '5LeVdnyxpMhAg906qnRc4wt12Nz6m2eexciMq55u'
+    # API credentials
+    API_KEY = '...' # excluded for security
+    API_SECRET = '...' # excluded for security
     BASE_URL = 'https://paper-api.alpaca.markets'
     API = tradeapi.REST(API_KEY, API_SECRET, base_url=BASE_URL, api_version='v2')
 
+    # Trading parameters
     SYMBOL = 'TSLA'
     SHORT_EWMA_SPAN = 5
     LONG_EWMA_SPAN = 10
 
+    # Initialize trading objects
     fetcher = AlpacaDataFetcher(API, API_KEY, API_SECRET, SYMBOL)
     signal_generator = DualEWMASignal(short_ewma_span=SHORT_EWMA_SPAN, long_ewma_span=LONG_EWMA_SPAN)
     trader = AlpacaTrader(API)

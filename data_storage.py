@@ -35,9 +35,9 @@ def save_data(data, symbol, date):
 def send_email():
     smtp_server = 'smtp.gmail.com'
     smtp_port = 587
-    sender_email = 'amy9.lee@gmail.com'
-    sender_password = '...' # commented out for security
-    recipient_email = 'amyelee@uchicago.com'
+    sender_email = '...' # excluded for security
+    sender_password = '...' # excluded for security
+    recipient_email = '...' # excluded for security
     subject = 'Data Save Error'
     body = 'The data was not saved properly.'
 
@@ -88,14 +88,12 @@ def fetch_and_store_data(api, symbol, timeframe, date):
     
 
 if __name__ == '__main__':
-    # ============================
-    # Set the Alpaca API key and secret
-    api_key = 'PKO6SDSYV5QF031PCVI5'
-    api_secret = '0CnP1cSZtiQkJRSHjOce5zxjh69MA3UmyUGgFMwM'
+    # Alpaca api credentials
+    api_key = '...' # excluded for security
+    api_secret = '...' # excluded for security
     base_url = 'https://paper-api.alpaca.markets' 
     api = tradeapi.REST(api_key, api_secret, base_url, api_version='v2')
-    
-    # ============================
+
     # Fetch and store data
     symbol = 'TSLA'
     timeframe = '1Min'
@@ -105,7 +103,7 @@ if __name__ == '__main__':
     fetch_and_store_data(api, symbol, timeframe, date)
     print(f"Data for {symbol} on {date} has been saved.")
 
-    # ============================
+
     ## back log data
     # date_range = pd.date_range(start='2023-11-22', end='2024-11-22')
     # date_list = date_range.strftime('%Y-%m-%d').tolist()
