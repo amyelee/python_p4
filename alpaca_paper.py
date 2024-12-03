@@ -46,8 +46,8 @@ class DualEWMASignal:
         """
         self.fast_ewma = None
         self.slow_ewma = None
-        self.alpha_fast = 2 / (short_ewma_span + 1)
-        self.alpha_slow = 2 / (long_ewma_span + 1)
+        self.alpha_fast = 2 / (long_ewma_span + 1)
+        self.alpha_slow = 2 / (short_ewma_span + 1)
 
     def update(self, price):
         """
@@ -163,6 +163,7 @@ if __name__ == '__main__':
     SYMBOL = 'TSLA'
     SHORT_EWMA_SPAN = 5
     LONG_EWMA_SPAN = 10
+
     fetcher = AlpacaDataFetcher(API, API_KEY, API_SECRET, SYMBOL)
     signal_generator = DualEWMASignal(short_ewma_span=SHORT_EWMA_SPAN, long_ewma_span=LONG_EWMA_SPAN)
     trader = AlpacaTrader(API, initial_account_value=100_000, initial_buying_power=200_000)
@@ -182,7 +183,9 @@ if __name__ == '__main__':
                     # generate signals/update ewma
                     fetcher.prices_fetched += 1
                     latest_close_price = latest_bars['c']
+                    print(f"Latest close price: {latest_close_price}")
                     signal = signal_generator.update(latest_close_price)
+                    print(signal_generator.fast_ewma , signal_generator.slow_ewma)
                     # Wait for enough data to calculate the EWMA and generate signals
                     if (fetcher.prices_fetched > LONG_EWMA_SPAN):
                         # Execute trades based on signals
