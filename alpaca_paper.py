@@ -1,8 +1,6 @@
 import alpaca_trade_api as tradeapi
 import time
 import requests
-import json
-import pandas as pd
 import math
 
 # == Exceptions == 
@@ -186,23 +184,20 @@ if __name__ == '__main__':
                     latest_close_price = latest_bars['c']
                     signal = signal_generator.update(latest_close_price)
                     # Wait for enough data to calculate the EWMA and generate signals
-                    if fetcher.prices_fetched < LONG_EWMA_SPAN:
-                        time.sleep(62)
-                        continue
-                else:
-                    continue
+                    if (fetcher.prices_fetched > LONG_EWMA_SPAN):
+                        # Execute trades based on signals
+                        if signal == 1:
+                            # Place Buy order
+                            quantity = (0.2*trader.buying_power) // latest_close_price
+                            trader.place_buy_order(SYMBOL, quantity)
+                            print("Buy order placed at {}".format(latest_close_price))
+                        if signal == -1:
+                            # Place Sell order
+                            quantity = math.floor(0.2*trader.positions)
+                            if quantity > 0:
+                                trader.place_sell_order(SYMBOL, quantity)
+                                print("Sell order placed at {}".format(latest_close_price))
 
-                if signal == 1:
-                    # Place Buy order
-                    quantity = (0.2*trader.buying_power) // latest_close_price
-                    trader.place_buy_order(SYMBOL, quantity)
-                    print("Buy order placed at {}".format(latest_close_price))
-                if signal == -1:
-                    # Place Sell order
-                    quantity = math.floor(0.2*trader.positions)
-                    trader.place_sell_order(SYMBOL, quantity)
-                    print("Sell order placed at {}".format(latest_close_price))
-            
             # wait for next minbar
             time.sleep(62)
 
