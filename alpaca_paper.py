@@ -12,8 +12,11 @@ class PlaceOrderException(Exception):
     def __init__(self, message):            
         super().__init__(message)
 
+class TradingLimitsExceeded(Exception):
+    def __init__(self, message):            
+        super().__init__(message)
+
 class AlpacaDataFetcher:
-    # Class to fetch latest bars data from Alpaca API
     def __init__(self, api, api_key, api_secret, symbol):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -27,6 +30,11 @@ class AlpacaDataFetcher:
         self.prices_fetched = 0
 
     def fetch_latest_bars(self):
+        """
+        Fetch latest bars data for the specified symbol.
+        Returns:
+            Latest bars data.
+        """
         url = f"https://data.alpaca.markets/v2/stocks/bars/latest?symbols={self.symbol}&feed=iex"
         response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
@@ -41,8 +49,8 @@ class DualEWMASignal:
         """
         Initialize dual EWMA crossover strategy.
         Params:
-            alpha_fast: Smoothing factor for fast EWMA.
-            alpha_slow: Smoothing factor for slow EWMA.
+            long_ewma_span: Specify fast decay in terms of span
+            short_ewma_span: Specify short decay in terms of span
         """
         self.fast_ewma = None
         self.slow_ewma = None
@@ -78,14 +86,11 @@ class DualEWMASignal:
             return 0  # hold
 
 class AlpacaTrader:
-    def __init__(self, api, initial_account_value, initial_buying_power):
+    def __init__(self, api):
         self.api = api
-        self.account_value = initial_account_value
-        self.buying_power = initial_buying_power
-        self.cash = initial_account_value
         self.positions = 0
 
-    def get_order_price(self, order):
+    def get_order_price(self, order_id):
         """
         Get the average filled price of an order.
         Params:
@@ -93,19 +98,27 @@ class AlpacaTrader:
         Returns: 
             Average filled price.
         """
-        order_status = self.api.get_order(order.id)
-        if order_status.status == 'filled':
-            return float(order_status.filled_avg_price)
+        try:
+            order_status = self.api.get_order(order_id)
+            if order_status.status == 'filled':
+                return float(order_status.filled_avg_price)
+        except:
+            raise AlpacaDataFetcherException("Failed to get order price.")
 
-    def place_buy_order(self, symbol, qty):
+    def place_buy_order(self, symbol, qty=None, latest_close_price=None):
         """
         Place a buy (market) order for the specified symbol and quantity.
         Params:
             symbol: Stock symbol to buy.
-            qty: Quantity of stock to buy.
+            qty: Quantity of stock to buy, if not specified, calculate based on buying power.
         """
+        if qty is None:                    
+            buying_power = float(self.api.get_account().buying_power)
+            qty = int((0.2*buying_power) // latest_close_price)
+            if qty == 0:
+                raise TradingLimitsExceeded("Insufficient buying power.")
         try:
-            order = self.api.submit_order(
+            self.api.submit_order(
                 symbol=symbol,
                 qty=qty,
                 side='buy',
@@ -115,22 +128,19 @@ class AlpacaTrader:
         except:
             raise PlaceOrderException("Failed to place buy order.")
         else:
-            price = self.get_order_price(order)
-            cost = qty * price
-            self.cash -= cost
             self.positions += qty
-            self. account_value = self.cash + (self.positions * price)
-            self.buying_power -=  cost
 
-    def place_sell_order(self, symbol, qty):
+    def place_sell_order(self, symbol, qty=None):
         """
         Place a sell (market) order for the specified symbol and quantity.
         Params:
             symbol: Stock symbol to sell.
-            qty: Quantity of stock to sell.
+            qty: Quantity of stock to sell, if not specified, calculate based on current positions.
         """
+        if qty is None:
+            qty = math.floor(0.2*self.positions)
         try:
-            order = self.api.submit_order(
+            self.api.submit_order(
                 symbol=symbol,
                 qty=qty,
                 side='sell',
@@ -140,23 +150,20 @@ class AlpacaTrader:
         except:
             raise PlaceOrderException("Failed to place sell order.")
         else:
-            price = self.get_order_price(order)
-            self.cash += qty * price
             self.positions -= qty
-            self.account_value = self.cash + (self.positions * price)
-            self.buying_power += qty * price
+        
 
     def eod_liquidate(self, symbol):
         """
         Liquidate all positions at the end of the day.
         """
         if self.positions > 0:
-            self.place_sell_order(symbol, self.positions)
+            self.place_sell_order(symbol=symbol, qty=self.positions)
 
 
 if __name__ == '__main__':
-    API_KEY = 'PKAS5FD8FYDEEC3PSTN0'
-    API_SECRET = 'xG9nPePOlf52cg4sfQRbYwq25ZW4nduBMypp8Y3V'
+    API_KEY = 'PKQ7A3U6OL704ZZ8083C'
+    API_SECRET = '5LeVdnyxpMhAg906qnRc4wt12Nz6m2eexciMq55u'
     BASE_URL = 'https://paper-api.alpaca.markets'
     API = tradeapi.REST(API_KEY, API_SECRET, base_url=BASE_URL, api_version='v2')
 
@@ -166,7 +173,7 @@ if __name__ == '__main__':
 
     fetcher = AlpacaDataFetcher(API, API_KEY, API_SECRET, SYMBOL)
     signal_generator = DualEWMASignal(short_ewma_span=SHORT_EWMA_SPAN, long_ewma_span=LONG_EWMA_SPAN)
-    trader = AlpacaTrader(API, initial_account_value=100_000, initial_buying_power=200_000)
+    trader = AlpacaTrader(API)
 
     while True:
         try:
@@ -185,28 +192,25 @@ if __name__ == '__main__':
                     latest_close_price = latest_bars['c']
                     print(f"Latest close price: {latest_close_price}")
                     signal = signal_generator.update(latest_close_price)
-                    print(signal_generator.fast_ewma , signal_generator.slow_ewma)
+                    print(f"Fast EWMA: {signal_generator.fast_ewma}, Slow EWMA: {signal_generator.slow_ewma}")
                     # Wait for enough data to calculate the EWMA and generate signals
-                    if (fetcher.prices_fetched > LONG_EWMA_SPAN):
+                    if (fetcher.prices_fetched >= LONG_EWMA_SPAN):
                         # Execute trades based on signals
                         if signal == 1:
                             # Place Buy order
-                            quantity = (0.2*trader.buying_power) // latest_close_price
-                            trader.place_buy_order(SYMBOL, quantity)
+                            trader.place_buy_order(symbol = SYMBOL, latest_close_price=latest_close_price)
                             print("Buy order placed at {}".format(latest_close_price))
                         if signal == -1:
                             # Place Sell order
-                            quantity = math.floor(0.2*trader.positions)
-                            if quantity > 0:
-                                trader.place_sell_order(SYMBOL, quantity)
+                            if trader.positions > 0:
+                                trader.place_sell_order(symbol = SYMBOL)
                                 print("Sell order placed at {}".format(latest_close_price))
 
             # wait for next minbar
             time.sleep(62)
 
-        except (AlpacaDataFetcherException, PlaceOrderException) as e:
+        except (AlpacaDataFetcherException, PlaceOrderException, TradingLimitsExceeded) as e:
             print(e)
 
         except Exception:
             print("An unexpected error occurred.")
-            break
