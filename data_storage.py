@@ -10,6 +10,13 @@ from datetime import datetime, timedelta
 def get_historical_alpaca_data(api, symbol, timeframe, start, end):
     """
     Fetch historical price data from Alpaca.
+    Params:
+        symbol: Stock symbol
+        timeframe: Timeframe for the data
+        start: Start date for the data
+        end: End date for the data
+    Returns:
+        Historical price data
     """
     data = api.get_bars(symbol, timeframe, start=start, end=end).df
     return data
@@ -28,11 +35,18 @@ def clean_min_bars(data):
 def save_data(data, symbol, date):
     """
     Save the data to a Parquet file.
+    Params:
+        data: Data to save
+        symbol: Stock symbol
+        date: Date of the data
     """
     data.to_parquet(f'{symbol}_{date}.parquet')
 
-# function to send email if data does not exist
+
 def send_email():
+    """
+    Sends an email if the data was not saved properly.
+    """
     smtp_server = 'smtp.gmail.com'
     smtp_port = 587
     sender_email = '...' # excluded for security
@@ -57,12 +71,16 @@ def send_email():
     except Exception as e:
         print(f'Failed to send email: {e}')
 
-def check_data_exists(symbol, timeframe, base_path=""):
+def check_data_exists(symbol, date, base_path=""):
     """
     Check if the data we added exists and if it has expected data in it
+    Params:
+        symbol: Stock symbol
+        date: date of data file
+        base_path: Path to the data files
     """
     try:
-        data = pd.read_csv(base_path + f'{symbol}_{timeframe}.parquet')
+        data = pd.read_csv(base_path + f'{symbol}_{date}.parquet')
     except FileNotFoundError:
         return False
     if data.empty:
@@ -71,15 +89,20 @@ def check_data_exists(symbol, timeframe, base_path=""):
 def fetch_and_store_data(api, symbol, timeframe, date):
     """
     Get the data for the given symbol, timeframe, and date
+    Params:
+        api: Alpaca API object
+        symbol: Stock symbol
+        timeframe: Timeframe for the data
+        date: Date of the data
     """
-    if check_data_exists(symbol, timeframe):
+    if check_data_exists(symbol, date):
         return
 
     data = get_historical_alpaca_data(api, symbol, timeframe, start=date, end=date)
     if not data.empty:
         data = clean_min_bars(data)
         save_data(data, symbol, date)
-        if check_data_exists(symbol, timeframe):
+        if check_data_exists(symbol, date):
             send_email()
     else:
         # this is to skip weekends and holidays
@@ -102,7 +125,6 @@ if __name__ == '__main__':
     os.chdir(f'/Users/amylee/Desktop/Financial Computing/Project/p4/data/{symbol}')
     fetch_and_store_data(api, symbol, timeframe, date)
     print(f"Data for {symbol} on {date} has been saved.")
-
 
     ## back log data
     # date_range = pd.date_range(start='2023-11-22', end='2024-11-22')

@@ -16,7 +16,9 @@ class TradingLimitsExceeded(Exception):
     def __init__(self, message):            
         super().__init__(message)
 
+# == Trading System Classes ==
 class AlpacaDataFetcher:
+    # Class to fetch the most recent min bar data for a given symbol
     def __init__(self, api, api_key, api_secret, symbol):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -44,7 +46,7 @@ class AlpacaDataFetcher:
             raise AlpacaDataFetcherException(f"Failed to fetch data: {response.status_code}")
 
 class DualEWMASignal:
-    # class to generate trading signals based on dual EWMA crossover strategy
+    # Class to generate trading signals based on dual EWMA crossover strategy
     def __init__(self, short_ewma_span, long_ewma_span):
         """
         Initialize dual EWMA crossover strategy.
@@ -86,6 +88,7 @@ class DualEWMASignal:
             return 0  # hold
 
 class AlpacaTrader:
+    # Class to place buy/sell orders based on trading signals
     def __init__(self, api):
         self.api = api
         self.positions = 0
@@ -159,7 +162,7 @@ class AlpacaTrader:
         if self.positions > 0:
             self.place_sell_order(symbol=symbol, qty=self.positions)
 
-
+# == Trading Loop ==
 if __name__ == '__main__':
     # API credentials
     API_KEY = '...' # excluded for security
